@@ -1,7 +1,16 @@
 module Main exposing (Model, init, main)
 
+import Bootstrap.Button as Button
+import Bootstrap.CDN as CDN
+import Bootstrap.Form as Form
+import Bootstrap.Form.Input as Input
+import Bootstrap.Form.InputGroup as InputGroup
+import Bootstrap.Grid as Grid
+import Bootstrap.Grid.Col as Col
+import Bootstrap.Grid.Row as Row
 import Browser
-import Html exposing (Html, div, text)
+import Html exposing (..)
+import Html.Attributes exposing (..)
 
 
 main =
@@ -36,4 +45,32 @@ update msg model =
 
 view : Model -> Html Msg
 view model =
-    div [] [ text model.name ]
+    Grid.container []
+        [ CDN.stylesheet
+        , Grid.row [ Row.centerMd, Row.middleXs ]
+            [ Grid.col
+                [ Col.sm4 ]
+                [ h3 [] [ text "Back Office TA" ]
+                , Form.form []
+                    [ Form.form []
+                        [ Form.group []
+                            [ InputGroup.config
+                                (InputGroup.text [ Input.success, Input.placeholder "username" ])
+                                |> InputGroup.predecessors
+                                    [ InputGroup.span [] [ text "@" ] ]
+                                |> InputGroup.view
+                            ]
+                        , Form.group []
+                            [ InputGroup.config
+                                (InputGroup.password [ Input.danger, Input.placeholder "password" ])
+                                |> InputGroup.predecessors
+                                    [ InputGroup.span [] [ text "*" ] ]
+                                |> InputGroup.view
+                            , Form.help [] [ text "Minimum 6 characters" ]
+                            ]
+                        , Button.button [ Button.primary ] [ text "Sign In" ]
+                        ]
+                    ]
+                ]
+            ]
+        ]
