@@ -22,23 +22,40 @@ main =
 
 
 type alias Model =
-    { name : String }
+    { username : String
+    , password : String
+    , submited : Bool
+    }
 
 
 init : () -> ( Model, Cmd Msg )
 init _ =
-    ( Model "Gagas", Cmd.none )
+    ( Model "" "" False
+    , Cmd.none
+    )
 
 
 type Msg
-    = Hamik
+    = Username String
+    | Password String
+    | Submit
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
-        Hamik ->
-            ( { model | name = "Xajhak" }
+        Username username ->
+            ( { model | username = username }
+            , Cmd.none
+            )
+
+        Password password ->
+            ( { model | password = password }
+            , Cmd.none
+            )
+
+        Submit ->
+            ( { model | submited = True }
             , Cmd.none
             )
 
@@ -68,7 +85,7 @@ view model =
                                 |> InputGroup.view
                             , Form.help [] [ text "Minimum 6 characters" ]
                             ]
-                        , Button.button [ Button.primary ] [ text "Sign In" ]
+                        , Button.button [ Button.primary, Button.onClick Submit ] [ text "Sign In" ]
                         ]
                     ]
                 ]
