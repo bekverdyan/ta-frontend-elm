@@ -8,28 +8,45 @@ import Bootstrap.Grid as Grid
 import Bootstrap.Grid.Col as Col
 import Bootstrap.Grid.Row as Row
 import Browser
+import Debug
 import Html exposing (..)
 import Html.Attributes exposing (..)
+import Http
+import Json.Decode as D
+import Json.Encode as E
 
 
 main =
-    Browser.element { init = init, update = update, view = view, subscriptions = always Sub.none }
+    Browser.element
+        { init = init
+        , update = update
+        , view = view
+        , subscriptions = always Sub.none
+        }
 
 
 
 -- MODEL
 
 
+type Request
+    = Wait
+    | Failure
+    | Loading
+    | Success String
+
+
 type alias Model =
     { username : String
     , password : String
     , submited : Bool
+    , request : Request
     }
 
 
 init : () -> ( Model, Cmd Msg )
 init _ =
-    ( Model "" "" False
+    ( Model "" "" False Wait
     , Cmd.none
     )
 
@@ -38,6 +55,24 @@ type Msg
     = Username String
     | Password String
     | Submit
+    | GotToken (Result Http.Error String)
+
+
+obtainToken : String -> String -> Cmd Msg
+obtainToken username password =
+    Http.post
+        { url = "http://localhost:3000/api/login"
+        , body = Http.jsonBody (toRequestBody username password)
+        , expect = Http.expectJson GotToken (D.field "token" D.string)
+        }
+
+
+toRequestBody : String -> String -> E.Value
+toRequestBody username password =
+    E.object
+        [ ( "email", E.string username )
+        , ( "password", E.string password )
+        ]
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -55,8 +90,20 @@ update msg model =
 
         Submit ->
             ( { model | submited = True }
-            , Cmd.none
+            , obtainToken model.username model.password
             )
+
+        GotToken response ->
+            case response of
+                Ok token ->
+                    ( { model | request = Success (Debug.log "token" token) }
+                    , Cmd.none
+                    )
+
+                Err _ ->
+                    ( { model | request = Debug.log "error" Failure }
+                    , Cmd.none
+                    )
 
 
 view : Model -> Html Msg
