@@ -96,12 +96,12 @@ update msg model =
         GotToken response ->
             case response of
                 Ok token ->
-                    ( { model | request = Success (Debug.log "token" token) }
+                    ( { model | request = Success token }
                     , Cmd.none
                     )
 
                 Err _ ->
-                    ( { model | request = Debug.log "error" Failure }
+                    ( { model | request = Failure }
                     , Cmd.none
                     )
 
@@ -116,14 +116,26 @@ view model =
                 , Form.form []
                     [ Form.group []
                         [ InputGroup.config
-                            (InputGroup.text [ Input.success, Input.placeholder "username" ])
+                            (InputGroup.text
+                                [ Input.success
+                                , Input.placeholder "username"
+                                , Input.value model.username
+                                , Input.onInput Username
+                                ]
+                            )
                             |> InputGroup.predecessors
                                 [ InputGroup.span [] [ text "@" ] ]
                             |> InputGroup.view
                         ]
                     , Form.group []
                         [ InputGroup.config
-                            (InputGroup.password [ Input.danger, Input.placeholder "password" ])
+                            (InputGroup.password
+                                [ Input.danger
+                                , Input.placeholder "password"
+                                , Input.value model.password
+                                , Input.onInput Password
+                                ]
+                            )
                             |> InputGroup.predecessors
                                 [ InputGroup.span [] [ text "*" ] ]
                             |> InputGroup.view
