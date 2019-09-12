@@ -1,4 +1,4 @@
-module Main exposing (Model, init, main)
+port module Main exposing (Model, init, main)
 
 import Bootstrap.Alert as Alert
 import Bootstrap.Button as Button
@@ -15,6 +15,9 @@ import Html.Attributes exposing (..)
 import Http
 import Json.Decode as D
 import Json.Encode as E
+
+
+port auth : E.Value -> Cmd msg
 
 
 main =
@@ -34,7 +37,7 @@ type Request
     = Wait
     | Failure String
     | Loading
-    | Success String
+    | Success
 
 
 type alias Model =
@@ -105,10 +108,10 @@ update msg model =
             case response of
                 Ok token ->
                     ( { model
-                        | request = Success token
+                        | request = Success
                         , alertVisibility = Alert.closed
                       }
-                    , Cmd.none
+                    , auth (E.object [ ( "token", E.string token ) ])
                     )
 
                 Err error ->
