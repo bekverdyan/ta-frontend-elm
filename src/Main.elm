@@ -31,7 +31,7 @@ main =
 
 type Request
     = Wait
-    | Failure
+    | Failure String
     | Loading
     | Success String
 
@@ -100,10 +100,48 @@ update msg model =
                     , Cmd.none
                     )
 
-                Err _ ->
-                    ( { model | request = Failure }
-                    , Cmd.none
-                    )
+                Err error ->
+                    case error of
+                        Http.BadUrl url ->
+                            ( { model
+                                | request =
+                                    Failure
+                                        (String.concat
+                                            [ "Bad Url request: "
+                                            , url
+                                            ]
+                                        )
+                              }
+                            , Cmd.none
+                            )
+
+                        Http.Timeout ->
+                            ( { model | request = Failure "Request timeout" }
+                            , Cmd.none
+                            )
+
+                        Http.NetworkError ->
+                            ( { model | request = Failure "Network error" }
+                            , Cmd.none
+                            )
+
+                        Http.BadStatus code ->
+                            ( { model
+                                | request =
+                                    Failure
+                                        (String.concat
+                                            [ "HTTP Error Code: "
+                                            , String.fromInt code
+                                            ]
+                                        )
+                              }
+                            , Cmd.none
+                            )
+
+                        Http.BadBody _ ->
+                            ( { model | request = Failure "Bad response body" }
+                            , Cmd.none
+                            )
 
 
 view : Model -> Html Msg
