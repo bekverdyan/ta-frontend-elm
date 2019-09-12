@@ -1,5 +1,6 @@
 module Main exposing (Model, init, main)
 
+import Bootstrap.Alert as Alert
 import Bootstrap.Button as Button
 import Bootstrap.Form as Form
 import Bootstrap.Form.Input as Input
@@ -41,12 +42,13 @@ type alias Model =
     , password : String
     , submited : Bool
     , request : Request
+    , alertVisibility : Alert.Visibility
     }
 
 
 init : () -> ( Model, Cmd Msg )
 init _ =
-    ( Model "" "" False Wait
+    ( Model "" "" False Wait Alert.closed
     , Cmd.none
     )
 
@@ -56,6 +58,7 @@ type Msg
     | Password String
     | Submit
     | GotToken (Result Http.Error String)
+    | AlertMsg Alert.Visibility
 
 
 obtainToken : String -> String -> Cmd Msg
@@ -93,10 +96,18 @@ update msg model =
             , obtainToken model.username model.password
             )
 
+        AlertMsg visibility ->
+            ( { model | alertVisibility = visibility }
+            , Cmd.none
+            )
+
         GotToken response ->
             case response of
                 Ok token ->
-                    ( { model | request = Success token }
+                    ( { model
+                        | request = Success token
+                        , alertVisibility = Alert.closed
+                      }
                     , Cmd.none
                     )
 
@@ -111,17 +122,24 @@ update msg model =
                                             , url
                                             ]
                                         )
+                                , alertVisibility = Alert.shown
                               }
                             , Cmd.none
                             )
 
                         Http.Timeout ->
-                            ( { model | request = Failure "Request timeout" }
+                            ( { model
+                                | request = Failure "Request timeout"
+                                , alertVisibility = Alert.shown
+                              }
                             , Cmd.none
                             )
 
                         Http.NetworkError ->
-                            ( { model | request = Failure "Network error" }
+                            ( { model
+                                | request = Failure "Network error"
+                                , alertVisibility = Alert.shown
+                              }
                             , Cmd.none
                             )
 
@@ -134,52 +152,80 @@ update msg model =
                                             , String.fromInt code
                                             ]
                                         )
+                                , alertVisibility = Alert.shown
                               }
                             , Cmd.none
                             )
 
                         Http.BadBody _ ->
-                            ( { model | request = Failure "Bad response body" }
+                            ( { model
+                                | request = Failure "Bad response body"
+                                , alertVisibility = Alert.shown
+                              }
                             , Cmd.none
                             )
 
 
+
+-- VIEW
+
+
+getErrorMessage : Request -> String
+getErrorMessage request =
+    case request of
+        Failure message ->
+            message
+
+        _ ->
+            ""
+
+
 view : Model -> Html Msg
 view model =
-    Grid.container []
-        [ Grid.row [ Row.centerMd, Row.middleXs ]
-            [ Grid.col
-                [ Col.sm4 ]
-                [ h3 [] [ text "Back Office TA" ]
-                , Form.form []
-                    [ Form.group []
-                        [ InputGroup.config
-                            (InputGroup.text
-                                [ Input.success
-                                , Input.placeholder "username"
-                                , Input.value model.username
-                                , Input.onInput Username
-                                ]
-                            )
-                            |> InputGroup.predecessors
-                                [ InputGroup.span [] [ text "@" ] ]
-                            |> InputGroup.view
+    div []
+        [ Alert.config
+            |> Alert.warning
+            |> Alert.dismissable AlertMsg
+            |> Alert.children
+                [ Alert.h6 [] [ text (getErrorMessage model.request) ] ]
+            |> Alert.view model.alertVisibility
+        , Grid.container []
+            [ Grid.row [ Row.centerMd, Row.middleXs ]
+                [ Grid.col
+                    [ Col.sm4 ]
+                    [ h3
+                        []
+                        [ text "Back Office TA" ]
+                    , Form.form []
+                        [ Form.group []
+                            [ InputGroup.config
+                                (InputGroup.text
+                                    [ Input.success
+                                    , Input.placeholder "username"
+                                    , Input.value model.username
+                                    , Input.onInput Username
+                                    ]
+                                )
+                                |> InputGroup.predecessors
+                                    [ InputGroup.span [] [ text "@" ] ]
+                                |> InputGroup.view
+                            ]
+                        , Form.group []
+                            [ InputGroup.config
+                                (InputGroup.password
+                                    [ Input.danger
+                                    , Input.placeholder "password"
+                                    , Input.value model.password
+                                    , Input.onInput Password
+                                    ]
+                                )
+                                |> InputGroup.predecessors
+                                    [ InputGroup.span [] [ text "*" ] ]
+                                |> InputGroup.view
+                            , Form.help [] [ text "Minimum 6 characters" ]
+                            ]
+                        , Button.button [ Button.primary, Button.onClick Submit ] [ text "Sign In" ]
                         ]
-                    , Form.group []
-                        [ InputGroup.config
-                            (InputGroup.password
-                                [ Input.danger
-                                , Input.placeholder "password"
-                                , Input.value model.password
-                                , Input.onInput Password
-                                ]
-                            )
-                            |> InputGroup.predecessors
-                                [ InputGroup.span [] [ text "*" ] ]
-                            |> InputGroup.view
-                        , Form.help [] [ text "Minimum 6 characters" ]
-                        ]
-                    , Button.button [ Button.primary, Button.onClick Submit ] [ text "Sign In" ]
                     ]
                 ]
             ]
