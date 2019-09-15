@@ -105,68 +105,69 @@ update msg model =
             )
 
         GotToken response ->
-            case response of
-                Ok token ->
+            handleResponse model response
+
+
+handleResponse : Model -> Result Http.Error String -> ( Model, Cmd Msg )
+handleResponse model response =
+    case response of
+        Ok token ->
+            ( { model
+                | request = Success
+                , alertVisibility = Alert.closed
+              }
+            , auth (E.object [ ( "token", E.string token ) ])
+            )
+
+        Err error ->
+            case error of
+                Http.BadUrl url ->
                     ( { model
-                        | request = Success
-                        , alertVisibility = Alert.closed
+                        | request =
+                            Failure
+                                (String.concat [ "Bad Url request: ", url ])
+                        , alertVisibility = Alert.shown
                       }
-                    , auth (E.object [ ( "token", E.string token ) ])
+                    , Cmd.none
                     )
 
-                Err error ->
-                    case error of
-                        Http.BadUrl url ->
-                            ( { model
-                                | request =
-                                    Failure
-                                        (String.concat
-                                            [ "Bad Url request: "
-                                            , url
-                                            ]
-                                        )
-                                , alertVisibility = Alert.shown
-                              }
-                            , Cmd.none
-                            )
+                Http.Timeout ->
+                    ( { model
+                        | request = Failure "Request timeout"
+                        , alertVisibility = Alert.shown
+                      }
+                    , Cmd.none
+                    )
 
-                        Http.Timeout ->
-                            ( { model
-                                | request = Failure "Request timeout"
-                                , alertVisibility = Alert.shown
-                              }
-                            , Cmd.none
-                            )
+                Http.NetworkError ->
+                    ( { model
+                        | request = Failure "Network error"
+                        , alertVisibility = Alert.shown
+                      }
+                    , Cmd.none
+                    )
 
-                        Http.NetworkError ->
-                            ( { model
-                                | request = Failure "Network error"
-                                , alertVisibility = Alert.shown
-                              }
-                            , Cmd.none
-                            )
+                Http.BadStatus code ->
+                    ( { model
+                        | request =
+                            Failure
+                                (String.concat
+                                    [ "HTTP Error Code: "
+                                    , String.fromInt code
+                                    ]
+                                )
+                        , alertVisibility = Alert.shown
+                      }
+                    , Cmd.none
+                    )
 
-                        Http.BadStatus code ->
-                            ( { model
-                                | request =
-                                    Failure
-                                        (String.concat
-                                            [ "HTTP Error Code: "
-                                            , String.fromInt code
-                                            ]
-                                        )
-                                , alertVisibility = Alert.shown
-                              }
-                            , Cmd.none
-                            )
-
-                        Http.BadBody _ ->
-                            ( { model
-                                | request = Failure "Bad response body"
-                                , alertVisibility = Alert.shown
-                              }
-                            , Cmd.none
-                            )
+                Http.BadBody _ ->
+                    ( { model
+                        | request = Failure "Bad response body"
+                        , alertVisibility = Alert.shown
+                      }
+                    , Cmd.none
+                    )
 
 
 
