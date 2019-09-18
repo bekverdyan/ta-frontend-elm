@@ -34,10 +34,15 @@ main =
 
 
 type Request
-    = Wait -- CORRECT MY NAME
+    = Initial -- CORRECT MY NAME
     | Failure String
     | Loading
     | Success
+
+
+type Status
+    = Unauthorized
+    | NotSent
 
 
 type alias Model =
@@ -46,12 +51,13 @@ type alias Model =
     , submited : Bool
     , request : Request
     , alertVisibility : Alert.Visibility
+    , statusCode : Status
     }
 
 
 init : () -> ( Model, Cmd Msg )
 init _ =
-    ( Model "" "" False Wait Alert.closed
+    ( Model "" "" False Initial Alert.closed NotSent
     , Cmd.none
     )
 
@@ -62,6 +68,7 @@ type Msg
     | Submit
     | GotToken (Result Http.Error String)
     | AlertMsg Alert.Visibility
+    | StatusCode Int
 
 
 obtainToken : String -> String -> Cmd Msg
@@ -85,14 +92,10 @@ update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
         Username username ->
-            ( { model | username = username }
-            , Cmd.none
-            )
+            ( { model | username = username }, Cmd.none )
 
         Password password ->
-            ( { model | password = password }
-            , Cmd.none
-            )
+            ( { model | password = password }, Cmd.none )
 
         Submit ->
             ( { model | submited = True }
@@ -100,12 +103,23 @@ update msg model =
             )
 
         AlertMsg visibility ->
-            ( { model | alertVisibility = visibility }
-            , Cmd.none
-            )
+            ( { model | alertVisibility = visibility }, Cmd.none )
 
         GotToken response ->
             handleResponse model response
+
+        StatusCode code ->
+            ( model, Cmd.none )
+
+
+handleStatusCode : Int -> Model -> ( Model, Cmd msg )
+handleStatusCode code model =
+    case code of
+        401 ->
+            ( { model | statusCode = Unauthorized }, Cmd.none )
+
+        _ ->
+            ( model, Cmd.none )
 
 
 handleResponse : Model -> Result Http.Error String -> ( Model, Cmd Msg )
@@ -148,19 +162,21 @@ handleResponse model response =
                     )
 
                 Http.BadStatus code ->
-                    ( { model
-                        | request =
-                            Failure
-                                (String.concat
-                                    [ "HTTP Error Code: "
-                                    , String.fromInt code
-                                    ]
-                                )
-                        , alertVisibility = Alert.shown
-                      }
-                    , Cmd.none
-                    )
+                    handleStatusCode code model
 
+                -- TO BE REMOVED
+                -- ( { model
+                --     | request =
+                --         Failure
+                --             (String.concat
+                --                 [ "HTTP Error Code: "
+                --                 , String.fromInt code
+                --                 ]
+                --             )
+                --     , alertVisibility = Alert.shown
+                --   }
+                -- , Cmd.none
+                -- )
                 Http.BadBody _ ->
                     ( { model
                         | request = Failure "Bad response body"
