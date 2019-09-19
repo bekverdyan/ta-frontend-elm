@@ -109,7 +109,7 @@ update msg model =
             handleResponse response model
 
         StatusCode code ->
-            ( model, Cmd.none )
+            handleStatusCode code model
 
 
 handleStatusCode : Int -> Model -> ( Model, Cmd msg )
