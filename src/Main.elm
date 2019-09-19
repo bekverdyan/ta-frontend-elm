@@ -106,7 +106,7 @@ update msg model =
             ( { model | alertVisibility = visibility }, Cmd.none )
 
         GotToken response ->
-            handleResponse model response
+            handleResponse response model
 
         StatusCode code ->
             ( model, Cmd.none )
@@ -122,8 +122,8 @@ handleStatusCode code model =
             ( model, Cmd.none )
 
 
-handleResponse : Model -> Result Http.Error String -> ( Model, Cmd Msg )
-handleResponse model response =
+handleResponse : Result Http.Error String -> Model -> ( Model, Cmd Msg )
+handleResponse response model =
     case response of
         Ok token ->
             ( { model
