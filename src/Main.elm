@@ -17,9 +17,6 @@ import Json.Decode as D
 import Json.Encode as E
 
 
-port auth : E.Value -> Cmd msg
-
-
 main =
     Browser.element
         { init = init
@@ -30,15 +27,14 @@ main =
 
 
 
+-- PORT
+
+
+port auth : E.Value -> Cmd msg
+
+
+
 -- MODEL
-
-
-type Request
-    = NotSentYet
-    | Failure String
-    | Loading
-    | Success
-    | Unauthorized
 
 
 type alias Model =
@@ -49,19 +45,23 @@ type alias Model =
     }
 
 
+type Request
+    = NotSentYet
+    | Failure Reason
+    | Loading
+    | Success
+
+
+type Reason
+    = Unauthorized
+    | Other String
+
+
 init : () -> ( Model, Cmd Msg )
 init _ =
     ( Model "" "" NotSentYet Alert.closed
     , Cmd.none
     )
-
-
-type Msg
-    = Username String
-    | Password String
-    | Submit
-    | GotToken (Result Http.Error String)
-    | AlertMsg Alert.Visibility
 
 
 obtainToken : String -> String -> Cmd Msg
@@ -79,6 +79,18 @@ toRequestBody username password =
         [ ( "email", E.string username )
         , ( "password", E.string password )
         ]
+
+
+
+-- UPDATE
+
+
+type Msg
+    = Username String
+    | Password String
+    | Submit
+    | GotToken (Result Http.Error String)
+    | AlertMsg Alert.Visibility
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -102,16 +114,6 @@ update msg model =
             handleResponse response model
 
 
-handleStatusCode : Int -> Model -> ( Model, Cmd Msg )
-handleStatusCode code model =
-    case code of
-        401 ->
-            ( { model | request = Unauthorized }, Cmd.none )
-
-        _ ->
-            ( model, Cmd.none )
-
-
 handleResponse : Result Http.Error String -> Model -> ( Model, Cmd Msg )
 handleResponse response model =
     case response of
@@ -127,7 +129,7 @@ handleResponse response model =
             case error of
                 Http.BadUrl url ->
                     ( { model
-                        | request = Failure ("Bad url: " ++ url)
+                        | request = Failure <| Other <| "Bad url: " ++ url
                         , alertVisibility = Alert.shown
                       }
                     , Cmd.none
@@ -135,7 +137,7 @@ handleResponse response model =
 
                 Http.Timeout ->
                     ( { model
-                        | request = Failure "Request timeout"
+                        | request = Failure <| Other "Request timeout"
                         , alertVisibility = Alert.shown
                       }
                     , Cmd.none
@@ -143,7 +145,7 @@ handleResponse response model =
 
                 Http.NetworkError ->
                     ( { model
-                        | request = Failure "Network error"
+                        | request = Failure <| Other "Network error"
                         , alertVisibility = Alert.shown
                       }
                     , Cmd.none
@@ -154,25 +156,30 @@ handleResponse response model =
 
                 Http.BadBody _ ->
                     ( { model
-                        | request = Failure "Unexpected content received"
+                        | request = Failure <| Other "Unexpected content received"
                         , alertVisibility = Alert.shown
                       }
                     , Cmd.none
                     )
 
 
-
--- VIEW
-
-
-getErrorMessage : Request -> String
-getErrorMessage request =
-    case request of
-        Failure message ->
-            message
+handleStatusCode : Int -> Model -> ( Model, Cmd Msg )
+handleStatusCode code model =
+    case code of
+        401 ->
+            ( { model
+                | request = Failure Unauthorized
+                , alertVisibility = Alert.shown
+              }
+            , Cmd.none
+            )
 
         _ ->
-            ""
+            ( model, Cmd.none )
+
+
+
+-- VIEW
 
 
 view : Model -> Html Msg
@@ -219,6 +226,21 @@ view model =
         ]
 
 
+getErrorMessage : Request -> String
+getErrorMessage request =
+    case request of
+        Failure type_ ->
+            case type_ of
+                Other message ->
+                    message
+
+                Unauthorized ->
+                    "Invalid USERNAME or PASSWORD"
+
+        _ ->
+            ""
+
+
 viewInput : Request -> String -> String -> (String -> Msg) -> List (Input.Option Msg)
 viewInput request placeholder value command =
     let
@@ -229,8 +251,13 @@ viewInput request placeholder value command =
             ]
     in
     case request of
-        Unauthorized ->
-            Input.danger :: regularInput
+        Failure type_ ->
+            case type_ of
+                Unauthorized ->
+                    Input.danger :: regularInput
+
+                _ ->
+                    regularInput
 
         _ ->
             regularInput
