@@ -8,6 +8,7 @@ import Bootstrap.Form.InputGroup as InputGroup
 import Bootstrap.Grid as Grid
 import Bootstrap.Grid.Col as Col
 import Bootstrap.Grid.Row as Row
+import Bootstrap.Utilities.Spacing as Spacing
 import Browser
 import Debug
 import Html exposing (..)
@@ -31,6 +32,9 @@ main =
 
 
 port auth : E.Value -> Cmd msg
+
+
+port navigateTo : E.Value -> Cmd msg
 
 
 
@@ -91,6 +95,7 @@ type Msg
     | Submit
     | GotToken (Result Http.Error String)
     | AlertMsg Alert.Visibility
+    | ForgotPassword
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -112,6 +117,9 @@ update msg model =
 
         GotToken response ->
             handleResponse response model
+
+        ForgotPassword ->
+            ( model, navigateTo (E.object [ ( "url", E.string "forgotPassword" ) ]) )
 
 
 handleResponse : Result Http.Error String -> Model -> ( Model, Cmd Msg )
@@ -218,7 +226,27 @@ view model =
                                 |> InputGroup.view
                             , Form.help [] [ text "Minimum 6 characters" ]
                             ]
-                        , Button.button [ Button.primary, Button.onClick Submit ] [ text "Sign In" ]
+                        , Grid.row
+                            [ Row.betweenXs ]
+                            [ Grid.col [ Col.xs4 ]
+                                [ Button.button
+                                    [ Button.roleLink
+                                    , Button.onClick ForgotPassword
+
+                                    -- , Button.attrs [ Spacing.mr5 ]
+                                    ]
+                                    [ text "Forgot password" ]
+                                ]
+                            , Grid.col [ Col.xs4 ]
+                                [ Button.button
+                                    [ Button.primary
+                                    , Button.onClick Submit
+
+                                    -- , Button.attrs [ Spacing.ml5 ]
+                                    ]
+                                    [ text "Sign In" ]
+                                ]
+                            ]
                         ]
                     ]
                 ]
