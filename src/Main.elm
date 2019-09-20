@@ -33,6 +33,9 @@ main =
 port auth : E.Value -> Cmd msg
 
 
+port navigateTo : E.Value -> Cmd msg
+
+
 
 -- MODEL
 
@@ -91,6 +94,7 @@ type Msg
     | Submit
     | GotToken (Result Http.Error String)
     | AlertMsg Alert.Visibility
+    | ForgotPassword
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -112,6 +116,9 @@ update msg model =
 
         GotToken response ->
             handleResponse response model
+
+        ForgotPassword ->
+            ( model, navigateTo (E.object [ ( "url", E.string "forgotPassword" ) ]) )
 
 
 handleResponse : Result Http.Error String -> Model -> ( Model, Cmd Msg )
