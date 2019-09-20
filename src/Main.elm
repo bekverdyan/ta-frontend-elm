@@ -34,30 +34,24 @@ main =
 
 
 type Request
-    = Initial -- CORRECT MY NAME
+    = NotSentYet
     | Failure String
     | Loading
     | Success
-
-
-type Status
-    = Unauthorized
-    | NotSent
+    | Unauthorized
 
 
 type alias Model =
     { username : String
     , password : String
-    , submited : Bool
     , request : Request
     , alertVisibility : Alert.Visibility
-    , statusCode : Status
     }
 
 
 init : () -> ( Model, Cmd Msg )
 init _ =
-    ( Model "" "" False Initial Alert.closed NotSent
+    ( Model "" "" NotSentYet Alert.closed
     , Cmd.none
     )
 
@@ -68,7 +62,6 @@ type Msg
     | Submit
     | GotToken (Result Http.Error String)
     | AlertMsg Alert.Visibility
-    | StatusCode Int
 
 
 obtainToken : String -> String -> Cmd Msg
@@ -98,7 +91,7 @@ update msg model =
             ( { model | password = password }, Cmd.none )
 
         Submit ->
-            ( { model | submited = True }
+            ( { model | alertVisibility = Alert.closed }
             , obtainToken model.username model.password
             )
 
@@ -108,15 +101,12 @@ update msg model =
         GotToken response ->
             handleResponse response model
 
-        StatusCode code ->
-            handleStatusCode code model
 
-
-handleStatusCode : Int -> Model -> ( Model, Cmd msg )
+handleStatusCode : Int -> Model -> ( Model, Cmd Msg )
 handleStatusCode code model =
     case code of
         401 ->
-            ( { model | statusCode = Unauthorized }, Cmd.none )
+            ( { model | request = Unauthorized }, Cmd.none )
 
         _ ->
             ( model, Cmd.none )
@@ -137,9 +127,7 @@ handleResponse response model =
             case error of
                 Http.BadUrl url ->
                     ( { model
-                        | request =
-                            Failure
-                                (String.concat [ "Bad Url request: ", url ])
+                        | request = Failure ("Bad url: " ++ url)
                         , alertVisibility = Alert.shown
                       }
                     , Cmd.none
@@ -164,22 +152,9 @@ handleResponse response model =
                 Http.BadStatus code ->
                     handleStatusCode code model
 
-                -- TO BE REMOVED
-                -- ( { model
-                --     | request =
-                --         Failure
-                --             (String.concat
-                --                 [ "HTTP Error Code: "
-                --                 , String.fromInt code
-                --                 ]
-                --             )
-                --     , alertVisibility = Alert.shown
-                --   }
-                -- , Cmd.none
-                -- )
                 Http.BadBody _ ->
                     ( { model
-                        | request = Failure "Bad response body"
+                        | request = Failure "Unexpected content received"
                         , alertVisibility = Alert.shown
                       }
                     , Cmd.none
@@ -219,12 +194,8 @@ view model =
                     , Form.form []
                         [ Form.group []
                             [ InputGroup.config
-                                (InputGroup.text
-                                    [ Input.success
-                                    , Input.placeholder "username"
-                                    , Input.value model.username
-                                    , Input.onInput Username
-                                    ]
+                                (InputGroup.text <|
+                                    viewInput model.request "username" model.username Username
                                 )
                                 |> InputGroup.predecessors
                                     [ InputGroup.span [] [ text "@" ] ]
@@ -232,12 +203,8 @@ view model =
                             ]
                         , Form.group []
                             [ InputGroup.config
-                                (InputGroup.password
-                                    [ Input.danger
-                                    , Input.placeholder "password"
-                                    , Input.value model.password
-                                    , Input.onInput Password
-                                    ]
+                                (InputGroup.password <|
+                                    viewInput model.request "password" model.password Password
                                 )
                                 |> InputGroup.predecessors
                                     [ InputGroup.span [] [ text "*" ] ]
@@ -250,3 +217,20 @@ view model =
                 ]
             ]
         ]
+
+
+viewInput : Request -> String -> String -> (String -> Msg) -> List (Input.Option Msg)
+viewInput request placeholder value command =
+    let
+        regularInput =
+            [ Input.placeholder placeholder
+            , Input.value value
+            , Input.onInput command
+            ]
+    in
+    case request of
+        Unauthorized ->
+            Input.danger :: regularInput
+
+        _ ->
+            regularInput
