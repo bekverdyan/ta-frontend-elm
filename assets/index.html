@@ -16,6 +16,10 @@
   var app = Elm.Main.init({
     node: document.getElementById('elm')
   });
+
+  app.ports.auth.subscribe(function(data) {
+    console.log('Eheheeey: ' + JSON.stringify(data))
+  })
   </script>
 </body>
 </html>

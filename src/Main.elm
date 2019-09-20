@@ -1,4 +1,4 @@
-module Main exposing (Model, init, main)
+port module Main exposing (Model, init, main)
 
 import Bootstrap.Alert as Alert
 import Bootstrap.Button as Button
@@ -17,6 +17,9 @@ import Json.Decode as D
 import Json.Encode as E
 
 
+port auth : E.Value -> Cmd msg
+
+
 main =
     Browser.element
         { init = init
@@ -31,16 +34,16 @@ main =
 
 
 type Request
-    = Wait
+    = NotSentYet
     | Failure String
     | Loading
-    | Success String
+    | Success
+    | Unauthorized
 
 
 type alias Model =
     { username : String
     , password : String
-    , submited : Bool
     , request : Request
     , alertVisibility : Alert.Visibility
     }
@@ -48,7 +51,7 @@ type alias Model =
 
 init : () -> ( Model, Cmd Msg )
 init _ =
-    ( Model "" "" False Wait Alert.closed
+    ( Model "" "" NotSentYet Alert.closed
     , Cmd.none
     )
 
@@ -82,88 +85,80 @@ update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
         Username username ->
-            ( { model | username = username }
-            , Cmd.none
-            )
+            ( { model | username = username }, Cmd.none )
 
         Password password ->
-            ( { model | password = password }
-            , Cmd.none
-            )
+            ( { model | password = password }, Cmd.none )
 
         Submit ->
-            ( { model | submited = True }
+            ( { model | alertVisibility = Alert.closed }
             , obtainToken model.username model.password
             )
 
         AlertMsg visibility ->
-            ( { model | alertVisibility = visibility }
-            , Cmd.none
-            )
+            ( { model | alertVisibility = visibility }, Cmd.none )
 
         GotToken response ->
-            case response of
-                Ok token ->
+            handleResponse response model
+
+
+handleStatusCode : Int -> Model -> ( Model, Cmd Msg )
+handleStatusCode code model =
+    case code of
+        401 ->
+            ( { model | request = Unauthorized }, Cmd.none )
+
+        _ ->
+            ( model, Cmd.none )
+
+
+handleResponse : Result Http.Error String -> Model -> ( Model, Cmd Msg )
+handleResponse response model =
+    case response of
+        Ok token ->
+            ( { model
+                | request = Success
+                , alertVisibility = Alert.closed
+              }
+            , auth (E.object [ ( "token", E.string token ) ])
+            )
+
+        Err error ->
+            case error of
+                Http.BadUrl url ->
                     ( { model
-                        | request = Success token
-                        , alertVisibility = Alert.closed
+                        | request = Failure ("Bad url: " ++ url)
+                        , alertVisibility = Alert.shown
                       }
                     , Cmd.none
                     )
 
-                Err error ->
-                    case error of
-                        Http.BadUrl url ->
-                            ( { model
-                                | request =
-                                    Failure
-                                        (String.concat
-                                            [ "Bad Url request: "
-                                            , url
-                                            ]
-                                        )
-                                , alertVisibility = Alert.shown
-                              }
-                            , Cmd.none
-                            )
+                Http.Timeout ->
+                    ( { model
+                        | request = Failure "Request timeout"
+                        , alertVisibility = Alert.shown
+                      }
+                    , Cmd.none
+                    )
 
-                        Http.Timeout ->
-                            ( { model
-                                | request = Failure "Request timeout"
-                                , alertVisibility = Alert.shown
-                              }
-                            , Cmd.none
-                            )
+                Http.NetworkError ->
+                    ( { model
+                        | request = Failure "Network error"
+                        , alertVisibility = Alert.shown
+                      }
+                    , Cmd.none
+                    )
 
-                        Http.NetworkError ->
-                            ( { model
-                                | request = Failure "Network error"
-                                , alertVisibility = Alert.shown
-                              }
-                            , Cmd.none
-                            )
+                Http.BadStatus code ->
+                    handleStatusCode code model
 
-                        Http.BadStatus code ->
-                            ( { model
-                                | request =
-                                    Failure
-                                        (String.concat
-                                            [ "HTTP Error Code: "
-                                            , String.fromInt code
-                                            ]
-                                        )
-                                , alertVisibility = Alert.shown
-                              }
-                            , Cmd.none
-                            )
-
-                        Http.BadBody _ ->
-                            ( { model
-                                | request = Failure "Bad response body"
-                                , alertVisibility = Alert.shown
-                              }
-                            , Cmd.none
-                            )
+                Http.BadBody _ ->
+                    ( { model
+                        | request = Failure "Unexpected content received"
+                        , alertVisibility = Alert.shown
+                      }
+                    , Cmd.none
+                    )
 
 
 
@@ -199,12 +194,8 @@ view model =
                     , Form.form []
                         [ Form.group []
                             [ InputGroup.config
-                                (InputGroup.text
-                                    [ Input.success
-                                    , Input.placeholder "username"
-                                    , Input.value model.username
-                                    , Input.onInput Username
-                                    ]
+                                (InputGroup.text <|
+                                    viewInput model.request "username" model.username Username
                                 )
                                 |> InputGroup.predecessors
                                     [ InputGroup.span [] [ text "@" ] ]
@@ -212,12 +203,8 @@ view model =
                             ]
                         , Form.group []
                             [ InputGroup.config
-                                (InputGroup.password
-                                    [ Input.danger
-                                    , Input.placeholder "password"
-                                    , Input.value model.password
-                                    , Input.onInput Password
-                                    ]
+                                (InputGroup.password <|
+                                    viewInput model.request "password" model.password Password
                                 )
                                 |> InputGroup.predecessors
                                     [ InputGroup.span [] [ text "*" ] ]
@@ -230,3 +217,20 @@ view model =
                 ]
             ]
         ]
+
+
+viewInput : Request -> String -> String -> (String -> Msg) -> List (Input.Option Msg)
+viewInput request placeholder value command =
+    let
+        regularInput =
+            [ Input.placeholder placeholder
+            , Input.value value
+            , Input.onInput command
+            ]
+    in
+    case request of
+        Unauthorized ->
+            Input.danger :: regularInput
+
+        _ ->
+            regularInput
