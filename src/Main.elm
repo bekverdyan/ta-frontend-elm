@@ -41,6 +41,12 @@ port navigateTo : E.Value -> Cmd msg
 -- MODEL
 
 
+type alias AuthResult =
+    { name : String -- authResult
+    , role : String -- List of ROLES | String
+    }
+
+
 type alias Model =
     { username : String
     , password : String
@@ -75,6 +81,13 @@ obtainToken username password =
         , body = Http.jsonBody (toRequestBody username password)
         , expect = Http.expectJson GotToken (D.field "token" D.string)
         }
+
+
+
+-- TODO IMPLEMENT ME
+-- toAuthResult : D.Value -> AuthResult
+-- toAuthResult decoded =
+--
 
 
 toRequestBody : String -> String -> E.Value
