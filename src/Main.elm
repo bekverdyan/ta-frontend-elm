@@ -42,9 +42,15 @@ port navigateTo : E.Value -> Cmd msg
 
 
 type alias AuthResult =
-    { name : String -- authResult
-    , role : String -- List of ROLES | String
+    { name : String
+    , role : String
+    , roles : List Role
+    , accountExpired : Bool
     }
+
+
+type alias Role =
+    ( String, Bool )
 
 
 type alias Model =
@@ -77,23 +83,50 @@ init _ =
 obtainToken : String -> String -> Cmd Msg
 obtainToken username password =
     Http.post
-        { url = "http://localhost:3000/api/login"
-        , body = Http.jsonBody (toRequestBody username password)
-        , expect = Http.expectJson GotToken (D.field "token" D.string)
+        { url = "http://localhost:8080/OOB-PRODUCT-BO-TA/rest/login/authenticate"
+        , body = Http.jsonBody (encodeRequestBody username password)
+        , expect = Http.expectJson GotToken decodeAuthResult
         }
 
 
 
 -- TODO IMPLEMENT ME
--- toAuthResult : D.Value -> AuthResult
--- toAuthResult decoded =
---
 
 
-toRequestBody : String -> String -> E.Value
-toRequestBody username password =
+decodeAuthResult : D.Decoder AuthResult
+decodeAuthResult =
+    D.map4 AuthResult
+        (D.field "name" D.string)
+        (D.field "role" D.string)
+        (D.field "roles" decodeRole)
+        (D.field "accountExpired" D.bool)
+
+
+decodeRole : D.Decoder (List ( String, Bool ))
+decodeRole =
+    D.keyValuePairs D.bool
+
+
+encodeAuthResult : AuthResult -> E.Value
+encodeAuthResult authResult =
     E.object
-        [ ( "email", E.string username )
+        [ ( "name", E.string authResult.name )
+        , ( "role", E.string authResult.role )
+        , ( "roles", E.list encodeRole authResult.roles )
+        , ( "accountExpired", E.bool authResult.accountExpired )
+        ]
+
+
+encodeRole : Role -> E.Value
+encodeRole ( name, indicator ) =
+    E.object
+        [ ( name, E.bool indicator ) ]
+
+
+encodeRequestBody : String -> String -> E.Value
+encodeRequestBody username password =
+    E.object
+        [ ( "username", E.string username )
         , ( "password", E.string password )
         ]
 
@@ -106,7 +139,7 @@ type Msg
     = Username String
     | Password String
     | Submit
-    | GotToken (Result Http.Error String)
+    | GotToken (Result Http.Error AuthResult)
     | AlertMsg Alert.Visibility
     | ForgotPassword
 
@@ -135,15 +168,15 @@ update msg model =
             ( model, navigateTo (E.object [ ( "url", E.string "forgotPassword" ) ]) )
 
 
-handleResponse : Result Http.Error String -> Model -> ( Model, Cmd Msg )
+handleResponse : Result Http.Error AuthResult -> Model -> ( Model, Cmd Msg )
 handleResponse response model =
     case response of
-        Ok token ->
+        Ok authResult ->
             ( { model
                 | request = Success
                 , alertVisibility = Alert.closed
               }
-            , auth (E.object [ ( "token", E.string token ) ])
+            , auth <| encodeAuthResult authResult
             )
 
         Err error ->
@@ -241,23 +274,19 @@ view model =
                             ]
                         , Grid.row
                             [ Row.betweenXs ]
-                            [ Grid.col [ Col.xs4 ]
-                                [ Button.button
-                                    [ Button.roleLink
-                                    , Button.onClick ForgotPassword
-
-                                    -- , Button.attrs [ Spacing.mr5 ]
-                                    ]
-                                    [ text "Forgot password" ]
-                                ]
-                            , Grid.col [ Col.xs4 ]
+                            [ Grid.col []
                                 [ Button.button
                                     [ Button.primary
                                     , Button.onClick Submit
-
-                                    -- , Button.attrs [ Spacing.ml5 ]
                                     ]
                                     [ text "Sign In" ]
+                                ]
+                            , Grid.col []
+                                [ Button.button
+                                    [ Button.roleLink
+                                    , Button.onClick ForgotPassword
+                                    ]
+                                    [ text "Forgot password" ]
                                 ]
                             ]
                         ]
